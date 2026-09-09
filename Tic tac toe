@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Surprise Tic-Tac-Toe Arcade</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        arcade: ['"Press Start 2P"', 'cursive'],
+                    },
+                    colors: {
+                        neonCyan: '#00f3ff',
+                        neonPink: '#ff007f',
+                        neonYellow: '#ffe600',
+                        neonPurple: '#a855f7',
+                        darkBg: '#0b0f19',
+                        cardBg: '#161e2e',
+                    },
+                    boxShadow: {
+                        cyanGlow: '0 0 20px rgba(0, 243, 255, 0.5), inset 0 0 10px rgba(0, 243, 255, 0.3)',
+                        pinkGlow: '0 0 20px rgba(255, 0, 127, 0.5), inset 0 0 10px rgba(255, 0, 127, 0.3)',
+                        purpleGlow: '0 0 25px rgba(168, 85, 247, 0.6)',
+                        yellowGlow: '0 0 20px rgba(255, 230, 0, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Glassmorphism containers */
+        .glass-panel {
+            background: rgba(22, 30, 46, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animated pulsing grid tiles */
+        .tile-surprise {
+            animation: pulseSurprise 1.5s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseSurprise {
+            0% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 230, 0, 0.4); }
+            100% { transform: scale(1.03); box-shadow: 0 0 25px rgba(255, 230, 0, 0.9); }
+        }
+
+        .tile-shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* Mark pop animations */
+        .mark-pop {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+            80% { transform: scale(1.15) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center relative font-sans p-3 sm:p-6">
+
+    <!-- Background Particle Canvas -->
+    <canvas id="particleCanvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+    <!-- Top Bar Navigation -->
+    <header class="w-full max-w-2xl flex justify-between items-center z-10 mb-4 glass-panel p-3 sm:p-4 rounded-2xl shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-neonCyan to-neonPurple flex items-center justify-center text-black font-extrabold text-xl shadow-cyanGlow">
+                ⚡
+            </div>
+            <div>
+                <h1 class="font-black text-lg sm:text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-neonCyan via-white to-neonPink uppercase">
+                    Surprise XO
+                </h1>
+                <p class="text-xs text-gray-400 font-medium hidden sm:block">Classic Tic-Tac-Toe with Crazy Power-Ups</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Audio Toggle -->
+            <button id="soundToggleBtn" onclick="toggleAudio()" class="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-gray-300 hover:text-neonCyan hover:border-neonCyan transition-all duration-200">
+                <i id="soundIcon" class="fas fa-volume-up text-lg"></i>
+            </button>
+            <!-- Rules Modal Button -->
+            <button onclick="openModal('rulesModal')" class="w-10 h-10 rounded-xl glass-panel flex items-center justify-center text-gray-300 hover:text-neonYellow hover:border-neonYellow transition-all duration-200" title="Game Rules & Surprise Info">
+                <i class="fas fa-circle-info text-lg"></i>
+            </button>
+            <!-- Deploy Button -->
+            <button onclick="openModal('deployModal')" class="px-3 py-2 rounded-xl bg-gradient-to-r from-neonPurple to-neonPink text-white font-bold text-xs sm:text-sm hover:opacity-90 transition shadow-purpleGlow flex items-center gap-2">
+                <i class="fab fa-github"></i>
+                <span class="hidden sm:inline">Deploy</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="w-full max-w-md z-10 flex flex-col items-center gap-4 my-auto">
+        
+        <!-- Scoreboard & Player Stats -->
+        <div class="w-full glass-panel rounded-2xl p-4 flex justify-between items-center relative overflow-hidden">
+            <!-- Active Player Indicator Bar -->
+            <div id="activeIndicator" class="absolute bottom-0 h-1 bg-neonCyan transition-all duration-300 w-1/2 left-0"></div>
+
+            <!-- Player 1 Box -->
+            <div id="p1Box" class="flex items-center gap-3 p-2 rounded-xl transition-all duration-300">
+                <div class="w-10 h-10 rounded-xl bg-cyan-950 border border-neonCyan flex items-center justify-center text-neonCyan font-black text-xl shadow-cyanGlow">
+                    X
+                </div>
+                <div>
+                    <p id="p1Label" class="text-xs text-gray-400 font-bold uppercase tracking-wider">Player X</p>
+                    <p id="p1Score" class="text-xl font-extrabold text-white">0</p>
+                </div>
+            </div>
+
+            <!-- VS Badge -->
+            <div class="text-xs font-arcade text-gray-500 uppercase px-2 py-1 bg-gray-900/60 rounded-md border border-gray-800">
+                VS
+            </div>
+
+            <!-- Player 2 Box -->
+            <div id="p2Box" class="flex items-center gap-3 p-2 rounded-xl transition-all duration-300 opacity-60">
+                <div class="text-right">
+                    <p id="p2Label" class="text-xs text-gray-400 font-bold uppercase tracking-wider">AI Bot</p>
+                    <p id="p2Score" class="text-xl font-extrabold text-white">0</p>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-pink-950 border border-neonPink flex items-center justify-center text-neonPink font-black text-xl shadow-pinkGlow">
+                    O
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Selectors & Controls -->
+        <div class="w-full flex justify-between items-center gap-2 text-xs font-semibold">
+            <!-- Game Mode Dropdown -->
+            <select id="modeSelect" onchange="changeMode()" class="bg-cardBg border border-gray-700 rounded-xl px-3 py-2 text-gray-200 outline-none focus:border-neonCyan flex-1">
+                <option value="surprise">🎁 Surprise Mystery Mode</option>
+                <option value="classic">⭕ Classic Tic-Tac-Toe</option>
+                <option value="vanishing">⏳ Vanishing Grid (3-Mark Limit)</option>
+            </select>
+
+            <!-- Opponent Select -->
+            <select id="opponentSelect" onchange="changeOpponent()" class="bg-cardBg border border-gray-700 rounded-xl px-3 py-2 text-gray-200 outline-none focus:border-neonCyan flex-1">
+                <option value="ai-easy">🤖 AI (Easy)</option>
+                <option value="ai-master" selected>🧠 AI (Nexus Unbeatable)</option>
+                <option value="pvp">👥 2-Player Local</option>
+            </select>
+        </div>
+
+        <!-- Banner Announcement Alert for Powerup Surprises -->
+        <div id="announcer" class="w-full py-2 px-4 rounded-xl glass-panel text-center text-sm font-bold min-h-[40px] flex items-center justify-center text-neonYellow border-neonYellow/30 transition-all duration-300 transform scale-95 opacity-0">
+            Welcome to Surprise Tic Tac Toe!
+        </div>
+
+        <!-- Game Board Container -->
+        <div class="relative w-full aspect-square max-w-[360px] glass-panel p-3 rounded-3xl shadow-2xl border border-gray-800 flex items-center justify-center">
+            <div id="board" class="grid grid-cols-3 gap-3 w-full h-full">
+                <!-- 9 Grid Buttons generated dynamically by JS -->
+            </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="w-full flex gap-3 mt-1">
+            <button onclick="resetGame(false)" class="flex-1 py-3 bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-white rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2">
+                <i class="fas fa-rotate-right"></i> Restart Round
+            </button>
+            <button onclick="resetScores()" class="py-3 px-4 bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-400 rounded-2xl font-bold transition-all active:scale-95" title="Reset Scores">
+                <i class="fas fa-trash-can"></i>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-2xl text-center text-xs text-gray-500 py-3 z-10">
+        Designed for GitHub Pages Deployment • Interactive Web Audio & Canvas FX
+    </footer>
+
+    <!-- SURPRISE REVEAL ANNOUNCEMENT POPUP OVERLAY -->
+    <div id="surpriseModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel border-neonYellow p-6 rounded-3xl max-w-sm w-full text-center transform transition-all scale-90 opacity-0 id-surprise-content">
+            <div id="surpriseIcon" class="text-6xl mb-3 animate-bounce">🎁</div>
+            <h3 id="surpriseTitle" class="text-2xl font-black text-neonYellow uppercase mb-2">SURPRISE!</h3>
+            <p id="surpriseDesc" class="text-sm text-gray-300 mb-6">You triggered a Mystery Box!</p>
+            <button onclick="closeSurpriseModal()" class="w-full py-3 bg-gradient-to-r from-neonYellow to-amber-500 text-black font-black uppercase tracking-wider rounded-xl hover:opacity-90 transition">
+                Continue Game 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- RULES & POWER-UPS MODAL -->
+    <div id="rulesModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel border-gray-700 p-6 rounded-3xl max-w-md w-full max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-black text-white flex items-center gap-2">
+                    <i class="fas fa-book-open text-neonCyan"></i> Game Modes & Rules
+                </h3>
+                <button onclick="closeModal('rulesModal')" class="text-gray-400 hover:text-white text-xl">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 text-sm text-gray-300">
+                <!-- Modes -->
+                <div class="bg-gray-900/60 p-3 rounded-2xl border border-gray-800">
+                    <h4 class="font-bold text-neonCyan mb-1">🎁 Surprise Mystery Mode</h4>
+                    <p class="text-xs text-gray-400">Random tiles contain hidden Mystery Boxes! Stepping on them triggers unexpected surprises that can flip the game!</p>
+                </div>
+
+                <div class="bg-gray-900/60 p-3 rounded-2xl border border-gray-800">
+                    <h4 class="font-bold text-neonPink mb-1">⏳ Vanishing Grid Mode</h4>
+                    <p class="text-xs text-gray-400">Each player can only have 3 marks on the board at a time. Placing your 4th mark automatically erases your 1st mark!</p>
+                </div>
+
+                <!-- Powerups catalog -->
+                <h4 class="font-extrabold text-white text-base mt-4 mb-2">✨ Surprise Power-Ups Catalog</h4>
+                
+                <div class="grid grid-cols-1 gap-2 text-xs">
+                    <div class="flex items-center gap-3 p-2 bg-gray-900/40 rounded-xl">
+                        <span class="text-2xl">💣</span>
+                        <div><strong class="text-neonYellow">Bomb:</strong> Clears all marks in surrounding adjacent tiles!</div>
+                    </div>
+                    <div class="flex items-center gap-3 p-2 bg-gray-900/40 rounded-xl">
+                        <span class="text-2xl">⚡</span>
+                        <div><strong class="text-neonYellow">Double Turn:</strong> Instant extra turn for whoever triggers it!</div>
+                    </div>
+                    <div class="flex items-center gap-3 p-2 bg-gray-900/40 rounded-xl">
+                        <span class="text-2xl">🛡️</span>
+                        <div><strong class="text-neonYellow">Shield Lock:</strong> Locks your mark so the opponent cannot modify or affect it!</div>
+                    </div>
+                    <div class="flex items-center gap-3 p-2 bg-gray-900/40 rounded-xl">
+                        <span class="text-2xl">🔄</span>
+                        <div><strong class="text-neonYellow">Symbol Swap:</strong> Converts one random opponent mark into your mark!</div>
+                    </div>
+                    <div class="flex items-center gap-3 p-2 bg-gray-900/40 rounded-xl">
+                        <span class="text-2xl">👻</span>
+                        <div><strong class="text-neonYellow">Phantom Vanish:</strong> Erases the opponent's most recent mark!</div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="closeModal('rulesModal')" class="w-full mt-5 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition">
+                Got It, Let's Play!
+            </button>
+        </div>
+    </div>
+
+    <!-- GITHUB DEPLOYMENT MODAL GUIDE -->
+    <div id="deployModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel border-neonPurple p-6 rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-black text-white flex items-center gap-2">
+                    <i class="fab fa-github text-neonPurple"></i> Deploy Free on GitHub Pages
+                </h3>
+                <button onclick="closeModal('deployModal')" class="text-gray-400 hover:text-white text-xl">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs sm:text-sm text-gray-300">
+                <p>Follow these quick steps to host this game live on GitHub Pages for free:</p>
+
+                <ol class="list-decimal list-inside space-y-3 font-medium text-gray-300 bg-gray-900/80 p-4 rounded-2xl border border-gray-800">
+                    <li>
+                        <strong class="text-neonCyan">Create a New GitHub Repository:</strong>
+                        <p class="text-xs text-gray-400 ml-5 mt-0.5">Go to GitHub.com, click <em>New Repository</em>, name it e.g., <code class="bg-gray-800 px-1 rounded text-white">surprise-tic-tac-toe</code>.</p>
+                    </li>
+                    <li>
+                        <strong class="text-neonCyan">Save This Code File:</strong>
+                        <p class="text-xs text-gray-400 ml-5 mt-0.5">Save this complete code as <code class="bg-gray-800 px-1 rounded text-white">index.html</code> on your device.</p>
+                    </li>
+                    <li>
+                        <strong class="text-neonCyan">Upload to Repository:</strong>
+                        <p class="text-xs text-gray-400 ml-5 mt-0.5">Inside your repo, click <em>Add file</em> &rarr; <em>Upload files</em>, drag <code class="bg-gray-800 px-1 rounded text-white">index.html</code>, and click <em>Commit changes</em>.</p>
+                    </li>
+                    <li>
+                        <strong class="text-neonCyan">Enable GitHub Pages:</strong>
+                        <p class="text-xs text-gray-400 ml-5 mt-0.5">Go to Repository <strong>Settings</strong> &rarr; <strong>Pages</strong> (on left sidebar). Under <em>Branch</em>, select <code class="bg-gray-800 px-1 rounded text-white">main</code> or <code class="bg-gray-800 px-1 rounded text-white">master</code> and click <strong>Save</strong>.</p>
+                    </li>
+                    <li>
+                        <strong class="text-neonPink">Your Game is Live! 🚀</strong>
+                        <p class="text-xs text-gray-400 ml-5 mt-0.5">Your URL will be ready at: <br><code class="text-neonYellow break-all">https://yourusername.github.io/surprise-tic-tac-toe/</code></p>
+                    </li>
+                </ol>
+            </div>
+
+            <button onclick="closeModal('deployModal')" class="w-full mt-5 py-3 bg-gradient-to-r from-neonPurple to-neonPink text-white font-bold rounded-xl transition shadow-purpleGlow">
+                Close Guide
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* WEB AUDIO API SYNTHESIZER FOR ARCADE SFX */
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'x-move') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now
